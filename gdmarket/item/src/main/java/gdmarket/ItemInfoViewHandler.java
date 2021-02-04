@@ -110,15 +110,4 @@ public class ItemInfoViewHandler {
         }
     }
 
-    @StreamListener(KafkaProcessor.INPUT)
-    public void whenItemDeleted_then_DELETE_1(@Payload ItemDeleted itemDeleted) {
-        try {
-            if (itemDeleted.isMe()) {
-                // view 레파지 토리에 삭제 쿼리
-                itemInfoRepository.deleteByItemNo(itemDeleted.getItemNo());
-            }
-        }catch (Exception e){
-            e.printStackTrace();
-        }
-    }
 }

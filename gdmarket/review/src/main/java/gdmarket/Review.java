@@ -3,6 +3,8 @@ package gdmarket;
 import javax.persistence.*;
 import org.springframework.beans.BeanUtils;
 import java.util.List;
+import gdmarket.external.Item;
+import gdmarket.external.ItemService;
 
 @Entity
 @Table(name="Review_table")
@@ -11,75 +13,67 @@ public class Review {
     @Id
     @GeneratedValue(strategy=GenerationType.AUTO)
     private Integer reviewNo;
+    private Integer customerId;
     private String customerName;
-    private Integer itemNo;
+    private String itemName;
     private Integer reservationNo;
-    private String reviewTxt;
+    private Integer score;
 
     @PostPersist
     public void onPostPersist(){
         Reviewed reviewed = new Reviewed();
+        reviewed.setCustomerId(this.getCustomerId());
+        reviewed.setScore(this.getScore());
+        reviewed.setCustomerName(this.getCustomerName());
         BeanUtils.copyProperties(this, reviewed);
         reviewed.publishAfterCommit();
 
-        //Following code causes dependency to external APIs
-        // it is NOT A GOOD PRACTICE. instead, Event-Policy mapping is recommended.
-
-        gdmarket.external.Item item = new gdmarket.external.Item();
+        Item item = new Item();
+        item.setItemNo(this.getReviewNo());
         // mappings goes here
-        ReviewApplication.applicationContext.getBean(gdmarket.external.ItemService.class)
-            .deleteItem(item);
-
-
+        ReviewApplication.applicationContext.getBean(ItemService.class).deleteItem(item.getItemNo());
+        try {
+            Thread.currentThread().sleep((long) (400 + Math.random() * 220));
+            System.out.println("=============아이템 삭제 완료=============");
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
-
-    @PrePersist
-    public void onPrePersist(){
-        RequestedReview requestedReview = new RequestedReview();
-        BeanUtils.copyProperties(this, requestedReview);
-        requestedReview.publishAfterCommit();
-
-
-    }
-
 
     public Integer getReviewNo() {
         return reviewNo;
     }
-
     public void setReviewNo(Integer reviewNo) {
         this.reviewNo = reviewNo;
     }
     public String getCustomerName() {
         return customerName;
     }
-
     public void setCustomerName(String customerName) {
         this.customerName = customerName;
     }
-    public Integer getItemNo() {
-        return itemNo;
+    public String getItemName() {
+        return itemName;
     }
-
-    public void setItemNo(Integer itemNo) {
-        this.itemNo = itemNo;
+    public void setItemName(String itemName) {
+        this.itemName = itemName;
+    }
+    public Integer getCustomerId() {
+        return customerId;
+    }
+    public void setCustomerId(Integer customerId) {
+        this.customerId = customerId;
     }
     public Integer getReservationNo() {
         return reservationNo;
     }
-
     public void setReservationNo(Integer reservationNo) {
         this.reservationNo = reservationNo;
     }
-    public String getReviewTxt() {
-        return reviewTxt;
+    public Integer getScore() {
+        return score;
     }
-
-    public void setReviewTxt(String reviewTxt) {
-        this.reviewTxt = reviewTxt;
+    public void setScore(Integer score) {
+        this.score = score;
     }
-
-
-
-
 }

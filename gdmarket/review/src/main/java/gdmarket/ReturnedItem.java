@@ -1,12 +1,12 @@
 package gdmarket;
 
-public class RentedItem extends AbstractEvent {
+public class ReturnedItem extends AbstractEvent {
 
     private Integer reservationNo;
     private String customerName;
     private Integer customerId;
     private String rentalStatus;
-    private Integer ItemNo;
+    private Integer itemNo;
 
     public Integer getReservationNo() {
         return reservationNo;
@@ -37,10 +37,10 @@ public class RentedItem extends AbstractEvent {
         this.rentalStatus = rentalStatus;
     }
     public Integer getItemNo() {
-        return ItemNo;
+        return itemNo;
     }
 
-    public void setItemNo(Integer ItemNo) {
-        this.ItemNo = ItemNo;
+    public void setItemNo(Integer itemNo) {
+        this.itemNo = itemNo;
     }
 }

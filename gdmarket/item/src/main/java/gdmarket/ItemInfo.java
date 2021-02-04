@@ -18,6 +18,7 @@ public class ItemInfo {
         private String rentalStatus;
         private Integer customerId;
         private String customerName;
+        private Integer score;
 
         public Integer getItemInfoNo() {
             return itemInfoNo;
@@ -73,5 +74,10 @@ public class ItemInfo {
         public void setCustomerName(String customerName) {
             this.customerName = customerName;
         }
-
+        public Integer getScore() {
+        return score;
+        }
+        public void setScore(Integer score) {
+            this.score = score;
+        }
 }

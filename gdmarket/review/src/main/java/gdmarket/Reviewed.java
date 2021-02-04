@@ -6,7 +6,9 @@ public class Reviewed extends AbstractEvent {
     private String customerName;
     private Integer itemNo;
     private Integer reservationNo;
-    private String reviewTxt;
+    private Integer score;
+    private Integer customerId;
+    private String managerId;
 
     public Reviewed(){
         super();
@@ -40,11 +42,25 @@ public class Reviewed extends AbstractEvent {
     public void setReservationNo(Integer reservationNo) {
         this.reservationNo = reservationNo;
     }
-    public String getReviewTxt() {
-        return reviewTxt;
+
+    public Integer getScore() {
+        return score;
     }
 
-    public void setReviewTxt(String reviewTxt) {
-        this.reviewTxt = reviewTxt;
+    public void setScore(Integer score) {
+        this.score = score;
     }
+    public String getManagerId() {
+        return managerId;
+    }
+    public void setManagerId(String managerId) {
+        this.managerId = managerId;
+    }
+    public Integer getCustomerId() {
+        return customerId;
+    }
+    public void setCustomerId(Integer customerId) {
+        this.customerId = customerId;
+    }
+
 }
