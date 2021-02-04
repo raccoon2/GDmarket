@@ -12,7 +12,7 @@ import java.util.Date;
 @FeignClient(name="item", url="${api.url.item}")
 public interface ItemService {
 
-    @RequestMapping(method= RequestMethod.DELETE, path="/items/{itemNo}")
-    public void deleteItem(@PathVariable("itemNo") Integer itemNo);
+    @RequestMapping(method= RequestMethod.PATCH, path="/items/{itemNo}/{itemStatus}")
+    public void deleteItem(@PathVariable("itemNo") Integer itemNo, @PathVariable("itemStatus") String itemStatus);
 
 }

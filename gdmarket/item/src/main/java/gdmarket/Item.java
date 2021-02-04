@@ -96,6 +96,9 @@ public class Item {
             System.out.println("@@@@@@@ returnedItem to Json @@@@@@@");
             System.out.println(returnedItem.toJson());
         }
+        if(("deleted").equals(this.getItemStatus()){
+            this.setRentalStatus("deleted");
+        }
     }
 
     @PreRemove
