@@ -24,30 +24,19 @@ spring:
                   serde: org.apache.kafka.common.serialization.Serdes$StringSerde
       bindings:
         event-in:
-          group: reservation
+          group: review
           destination: gdmarket
           contentType: application/json
         event-out:
           destination: gdmarket
           contentType: application/json
-feign:
-  hystrix:
-    enabled: true
 
-hystrix:
-  command:
-    default:
-      execution.isolation.thread.timeoutInMilliseconds: 610
-      
 logging:
   level:
     org.hibernate.type: trace
     org.springframework.cloud: debug
 server:
-  port: 8082
-api:
-  payment:
-    url: http://localhost:8083
+  port: 8084
 ---
 
 spring:
@@ -67,22 +56,9 @@ spring:
                   serde: org.apache.kafka.common.serialization.Serdes$StringSerde
       bindings:
         event-in:
-          group: reservation
+          group: review
           destination: gdmarket
           contentType: application/json
         event-out:
           destination: gdmarket
           contentType: application/json
-          
-feign:
-  hystrix:
-    enabled: true
-
-hystrix:
-  command:
-    default:
-      execution.isolation.thread.timeoutInMilliseconds: 610
-      
-api:
-  payment:
-    url: ${configurl}
