@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
 
 import java.util.Date;
 
-@FeignClient(name="item", url="http://localhost:8081")
+@FeignClient(name="item", url="${api.url.item}")
 public interface ItemService {
 
     @RequestMapping(method= RequestMethod.DELETE, path="/items/{itemNo}")

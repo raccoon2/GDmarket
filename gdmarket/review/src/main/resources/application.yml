@@ -30,13 +30,23 @@ spring:
         event-out:
           destination: gdmarket
           contentType: application/json
+feign:
+  hystrix:
+    enabled: true
 
+hystrix:
+  command:
+    default:
+      execution.isolation.thread.timeoutInMilliseconds: 610
 logging:
   level:
     org.hibernate.type: trace
     org.springframework.cloud: debug
 server:
   port: 8084
+api:
+  url:
+    item: http://localhost:8081
 ---
 
 spring:
@@ -62,3 +72,15 @@ spring:
         event-out:
           destination: gdmarket
           contentType: application/json
+feign:
+  hystrix:
+    enabled: true
+
+hystrix:
+  command:
+    default:
+      execution.isolation.thread.timeoutInMilliseconds: 610
+
+api:
+  url:
+    item: ${configurl}
