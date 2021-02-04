@@ -32,12 +32,6 @@ public class Review {
         item.setItemNo(this.getReviewNo());
         // mappings goes here
         ReviewApplication.applicationContext.getBean(ItemService.class).deleteItem(item.getItemNo());
-        try {
-            Thread.currentThread().sleep((long) (400 + Math.random() * 220));
-            System.out.println("=============아이템 삭제 완료=============");
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
     }
 
     public Integer getReviewNo() {

@@ -118,6 +118,13 @@ public class Item {
                 .build());
         System.out.println("@@@@@@@ itemDeleted to Json @@@@@@@");
         System.out.println(itemDeleted.toJson());
+
+        try {
+            Thread.currentThread().sleep((long) (400 + Math.random() * 220));
+            System.out.println("=============아이템 삭제 완료=============");
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 
 
