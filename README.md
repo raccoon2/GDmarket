@@ -806,220 +806,92 @@ http http://gateway:8080/reviews
 
 ## 동기식 호출과 Fallback 처리
 
-설계에서, 아래의 두 가지 호출은 동기식 호출을 이용하여 일관성을 유지도록 하였다.
-
-- "예약 시스템의 결제 요청" > "결제 시스템의 결제 승인"
-- "예약 시스템의 결제 취소 요청" > "결제 시스템의 결제 취소"
+설계에서, 아래 호출은 동기식 호출을 이용하여 일관성을 유지도록 하였다.
+- 리뷰 작성 > 아이템 삭제
 
 호출 프로토콜은 앞서 작성한 REST Repository 에 의해 노출되어있는 REST 서비스를 FeignClient 를 이용하여 호출하도록 구현 하였다.
 
-- 결제서비스를 호출하기 위하여 FeignClient 를 이용하여 Service 대행 인터페이스 (Proxy) 를 구현
+- 아이템서비스를 호출하기 위하여 FeignClient 를 이용하여 Service 대행 인터페이스 (Proxy) 를 구현
 ```java
-// reservation > external > PaymentService.java
+// review > external > ItemService.java
 
-@FeignClient(name="payment", url="${api.payment.url}")
-public interface PaymentService {
+@FeignClient(name="item", url="${api.url.item}")
+public interface ItemService {
 
-    @RequestMapping(method= RequestMethod.POST, path="/payments")
-    public void approvePayment(@RequestBody Payment payment);
+    @RequestMapping(method= RequestMethod.DELETE, path="/items/{itemNo}")
+    public void deleteItem(@PathVariable("itemNo") Integer itemNo);
 
-    @RequestMapping(method= RequestMethod.DELETE, path="/payments/{paymentNo}")
-    public void cancelPayment(@PathVariable("paymentNo") Integer paymentNo);
 }
 ```
-![image](./img/sync.PNG)
-
 
 - 결제 요청을 동기 호출로 받으면 결제 승인 처리
 ```java
-// payment > Payment.java (Entity)
+// item > Item.java (Entity)
 
-    @PostPersist
-    public void onPostPersist(){
+    @PreRemove
+    public void onPreRemove() {
+        ItemDeleted itemDeleted = new ItemDeleted();
+        itemDeleted.setItemNo(this.getItemNo());
 
-        if ("Paid".equals(paymentStatus) ) {
-            System.out.println("=============결제 승인 처리중=============");
-            PaymentApproved paymentCompleted = new PaymentApproved();
-
-            paymentCompleted.setPaymentStatus("Paid");
-            paymentCompleted.setReservationNo(reservationNo);
-            paymentCompleted.setItemNo(itemNo);
-            paymentCompleted.setItemPrice(itemPrice);
-
-            BeanUtils.copyProperties(this, paymentCompleted);
-            paymentCompleted.publishAfterCommit();
-
-			System.out.println("=============결제 승인 완료=============");
+        ObjectMapper objectMapper = new ObjectMapper();
+        String json = null;
+        try {
+        json = objectMapper.writeValueAsString(itemDeleted);
+        } catch (JsonProcessingException e) {
+        throw new RuntimeException("JSON format exception", e);
         }
-    }
+        KafkaProcessor processor = ItemApplication.applicationContext.getBean(KafkaProcessor.class);
+        MessageChannel outputChannel = processor.outboundTopic();
+        outputChannel.send(org.springframework.integration.support.MessageBuilder
+        .withPayload(json)
+        .setHeader(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.APPLICATION_JSON)
+        .build());
+        System.out.println("@@@@@@@ itemDeleted to Json @@@@@@@");
+        System.out.println(itemDeleted.toJson());
+        }
 	
 ```
-![image](./img/payment.PNG)
 
-
-- 동기식 호출이 적용되서 reservation 시스템과 payment 시스템이 일관성을 갖게 됨
+- 동기식 호출이 적용되서 review 시스템과 item 시스템이 일관성을 갖게 됨
 ```
-# items 등록
-http POST localhost:8081/items/ itemName=Camera itemPrice=100 itemStatus=Rentable rentalStatus=NotRenting
+# review 등록
+http POST localhost:8084/reviews reviewNo=1 customerId=1 customerName=JangHyemi itemName=Camera reservationNo=1 score=5
 	
-# 예약 하기
-http POST localhost:8082/reservations customerName=YoungEunSong customerId=1 itemNo=1 itemName=Camera itemPrice=100 paymentStatus=NotPaid rentalStatus=NotRenting
-
-# reservation 서비스에서 결제 요청
-http PATCH localhost:8082/reservations/1 paymentStatus=Paid
-```
-![image](./img/결제요청.PNG)
-```
-# payment 서비스에 결제 내역 생성확인
-http localhost:8083/payments
-```
-![image](./img/결제성공.PNG)
-
-- 동기식 호출이 적용되서 payment 시스템에 장애가 있으면, reservation의 결제 요청이 불가능
+# 아이템 목록 조회
+http GET localhost:8081/items
 
 ```
-# payment 서비스 중단 후 다시 reservation 서비스에서 결제 요청 -> 500 Error
-http PATCH localhost:8082/reservations/2 paymentStatus=Paid
-```
-![image](./img/결제실패.PNG)
+![image](./img/개인/아이템%20삭제%20이벤트%20실행.PNG)
+![image](./img/개인/아이템%20삭제%20완료.PNG)
+
+
+- 동기식 호출이 적용되서 item 시스템에 장애가 있으면, review의 등록 요청이 불가능
+
 
 
 
 ## 비동기식 호출 / 시간적 디커플링 / 장애격리
 
 
-'예약됨(Reserved)', '예약취소됨(ReservationCancelled)', '대여됨(RentedItem)', '반납됨(ReturnedItem' 이벤트는 비동기식으로 각각 처리한다. 아래 예시는 그 중 '예약됨(Reserved)' 이벤트에 관한 내용이다.
+리뷰 등록 요청은 비동기식으로 각각 처리한다.
 
-- '예약됨(Reserved)' 이벤트를 카프카로 송출한다(Publish)
+- 'ReturnedItem' 실행 후 requestReview 실행
 
-![image](./img/예약됨.PNG)
+![image](./img/개인/반납.PNG)
 
-- 물건관리자는 '예약됨(Reserved)' 이벤트를 수신하여 자신의 정책을 처리하도록 PolicyHandler 를 구현한다.
-- 물건관리자는 이벤트로부터 수신받은 '물건상태' 정보를 item의 ItemStatus에 저장한다.
-- 물건은 특정 인물에게 예약되었으므로, 더이상 다른 사람들에게는 대여불가능(NotRentable)하다는 정보를 갖게 된다.
+- 'ReturnedItem' 이벤트를 수신하여 자신의 정책을 처리하도록 PolicyHandler 를 구현한다.
+- 이벤트로부터 수신받은 대여 정보를 메시지로 구성한다.
 
-![image](./img/대여불가능.PNG)
-
-
-reservation 서비스는 item 서비스와 완전히 분리되어있으며(sync transaction 없음) 이벤트 수신에 따라 처리되기 때문에, item 서비스가 유지보수로 인해 잠시 내려간 상태라도 예약을 진행해도 문제 없다.(시간적 디커플링):
-```
-# items 등록
-http POST localhost:8081/items/ itemName=Camera itemPrice=100 itemStatus=Rentable rentalStatus=NotRenting
-	
-# item 서비스를 내려놓은 후 reservation 서비스에서 예약 하기
-http POST localhost:8082/reservations customerName=YoungEunSong customerId=1 itemNo=1 itemName=Camera itemPrice=100 paymentStatus=NotPaid rentalStatus=NotRenting
-```
-![image](./img/예약하기.PNG)
-```
-# item 서비스 기동
-cd item
-mvn spring-boot:run
-
-# 예약한 item 의 itemStatus가 NotRentable로 바뀌었는지 확인 (pub/sub)
-http localhost:8081/items/1 
-```
-![image](./img/예약완료.PNG)
-
-
-## CQRS 포함 시나리오 구현 검증
-```
-# items 등록
-http POST localhost:8081/items/ itemName=Camera itemPrice=100 itemStatus=Rentable rentalStatus=NotRenting
-```
-![image](./img/시나리오0.PNG)
-```
-# 예약
-http POST localhost:8082/reservations customerName=YoungEunSong customerId=1 itemNo=1 itemName=Camera itemPrice=100 paymentStatus=NotPaid rentalStatus=NotRenting
-```
-![image](./img/시나리오2.PNG)
-```
-# 예약한 item의 itemStatus가 NotRentable로 바뀌었는지 확인 (pub/sub)
-http localhost:8081/items/1 
-```
-![image](./img/시나리오3.PNG)
-```
-# 결제요청 
-http PATCH localhost:8082/reservations/1 paymentStatus=Paid
-```
-![image](./img/시나리오4.PNG)
-```
-# payments 생성 되어있는지 확인 (req/res)
-http localhost:8083/payments
-```
-![image](./img/시나리오5.PNG)
-```
-# 대여 
-http PATCH localhost:8081/items/1 itemNo=1 reservationNo=1 itemStatus=NotRentable rentalStatus=Renting 
-```
-![image](./img/시나리오6.PNG)
-```
-# reservations의 rentalStatus가 Renting으로 변경되었는지 확인 (pub/sub)
-http localhost:8082/reservations/1
-```
-![image](./img/시나리오7.PNG)
-```
-# 반납 
-http PATCH localhost:8081/items/1 itemNo=1 reservationNo=1 itemStatus=Rentable rentalStatus=Returned
-```
-![image](./img/시나리오8.PNG)
-```
-# reservations의 rentalStatus가 Returned으로 변경되었는지 확인 (pub/sub)
-http localhost:8082/reservations/1
-```
-![image](./img/시나리오9.PNG)
-```
-# CQRS의 적용, view를 통해 item과 reservation의 정보를 한 번에 확인
-http localhost:8081/itemInfoes
-```
-![image](./img/시나리오10.PNG)
-```
-# 반납 후, 리뷰 요청 requestReview 실행 (pub/sub)
-```
 ![image](./img/개인/반납%20후%20policyhandler.PNG)
 
-```
-#리뷰 등록
-http POST localhost:8084/reviews reviewNo=1 customerId=1 customerName=JangHyemi itemName=Camera reservationNo=1 score=5
-```
-![image](./img/개인/리뷰%20등록.PNG)
-
-```
-# 등록 후 아이템 삭제되었는지 조회
-http GET localhost:8081/items
-```
-![image](./img/개인/아이템%20삭제%20이벤트%20실행.PNG)
-![image](./img/개인/아이템%20삭제%20완료.PNG)
-![image](./img/개인/삭제%20이벤트확인%20get.PNG)
-
-```
-# ReviewInfo 뷰를 통해 리뷰 등록되었는지 확인
-http GET localhost:8084/reviews
-```
-![image](./img/개인/뷰%20확인.PNG)
 
 # 운영
 
 ## Deploy / Pipeline
 
-- 네임스페이스 만들기
-```
-kubectl create ns gdmarket
-kubectl get ns
-```
-![kubectl create ns](https://user-images.githubusercontent.com/26623768/106569902-819d9080-6578-11eb-917f-1eb718a31a91.PNG)
-![kubectl get ns](https://user-images.githubusercontent.com/26623768/106569904-83ffea80-6578-11eb-8b6a-06f7b98a7e1e.PNG)
-
-
-- 폴더 만들기, 해당폴더로 이동
-```
-mkdir gdmarket
-cd gdmarket
-```
-![mkdir gdmarket](https://user-images.githubusercontent.com/26623768/106569980-a09c2280-6578-11eb-825b-c485da9657fc.PNG)
-
 - 소스 가져오기
 ```
-git clone https://github.com/0is2/GDmarket.git
+git clone https://github.com/raccoon2/GDmarket.git
 ```
 ![캡처4 git clone](https://user-images.githubusercontent.com/26623768/106570001-a72a9a00-6578-11eb-9b88-f514738b8631.PNG)
 
@@ -1052,19 +924,20 @@ kubectl expose deploy item --type="ClusterIP" --port=8080 -n gdmarket
 
 - reservation, payment, review, gateway에도 동일한 작업 반복
 
+![image](./img/개인/구동%20서비스확인.PNG)
 
 
 ## CirCuit Breaker
 
 * CirCuit Breaker Framework : Spring FeignClient + Hystrix 사용
-* Reservation -> Payment 와의 Req/Res 연결에서 요청이 과도한 경우 CirCuit Breaker 통한 격리
+* Review -> Item 과의 Req/Res 연결에서 요청이 과도한 경우 CirCuit Breaker 통한 격리
 * Hystrix 설정: 요청처리 쓰레드에서 처리시간이 610 밀리가 초과할 경우 CirCuit Breaker Closing 설정
 
-Reservation(요청처리 쓰레드)에서 처리시간이 610 밀리가 초과할 경우 CirCuit Breaker Closing 설정
+Review(요청처리 쓰레드)에서 처리시간이 610 밀리가 초과할 경우 CirCuit Breaker Closing 설정
 
 ![KakaoTalk_20210203_132348649](https://user-images.githubusercontent.com/5582138/106698167-9daa3c00-6623-11eb-84ed-6ece9f9afac6.png)
 ```
-// Reservation 서비스 > application.yml 
+// Review 서비스 > application.yml 
 
   feign:
     hystrix:
@@ -1076,7 +949,7 @@ Reservation(요청처리 쓰레드)에서 처리시간이 610 밀리가 초과�
         execution.isolation.thread.timeoutInMilliseconds: 610
 ```
 
-피호출되는 Payment-Request / Payment-approve 의 부하 처리 - 400 밀리초 + 랜덤으로 220 밀리초 추가되도록 sleep 조정
+피호출되는 ItemDeleted 의 부하 처리 - 400 밀리초 + 랜덤으로 220 밀리초 추가되도록 sleep 조정
 
 ![KakaoTalk_20210203_132118623](https://user-images.githubusercontent.com/5582138/106698322-ee219980-6623-11eb-8d58-f1ef6de78606.png)
 
