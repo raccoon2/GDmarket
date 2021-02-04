@@ -23,7 +23,7 @@ spec:
             - name: configurl
               valueFrom:
                 configMapKeyRef:
-                  name: apiurl
+                  name: itemurl
                   key: url
           readinessProbe:
             httpGet:
