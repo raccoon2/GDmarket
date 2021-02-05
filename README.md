@@ -694,7 +694,8 @@ kubectl get pod liveness-exec -o wide
 ~~~
 ![commandProbe05](https://user-images.githubusercontent.com/20763542/106618918-600dca80-65b3-11eb-9868-a71500c4afc6.jpg)
 
--------
+
+-------------------------
 
 # 개인 프로젝트
 
@@ -767,12 +768,12 @@ mvn spring-boot:run
 ## DDD의 적용
 
 각 서비스에서 도출된 핵심 aggregate 객체를 entity 로 선언하였다. 아래 캡처의 review 마이크로 서비스가 그 예시이다.
+![image](./img/개인/item.PNG)
 
-![image](./img/개인/DDD.PNG)
 
 Entity Pattern 과 Repository Pattern 을 적용하여 JPA 를 통하여 다양한 데이터소스 유형 (RDB or NoSQL) 에 대한 별도의 처리가 없도록 데이터 접근 어댑터를 자동 생성하기 위하여 Spring Data REST 의 RestRepository 를 적용하였다
 
-![image](./img/RESTRepo.PNG)
+![image](./img/개인/repository.PNG)
 
 
 ## 폴리글랏 퍼시스턴스
@@ -800,7 +801,7 @@ gateway 테스트
 ```
 http http://gateway:8080/reviews
 ```
-![gateway](https://user-images.githubusercontent.com/26623768/106683440-dc31fd80-6607-11eb-95ea-f928dcd08e4a.PNG)
+![image](./img/개인/gateway%20review성공.PNG)
 
 
 
@@ -927,89 +928,18 @@ kubectl expose deploy item --type="ClusterIP" --port=8080 -n gdmarket
 ![image](./img/개인/구동%20서비스확인.PNG)
 
 
-## CirCuit Breaker
-
-* CirCuit Breaker Framework : Spring FeignClient + Hystrix 사용
-* Review -> Item 과의 Req/Res 연결에서 요청이 과도한 경우 CirCuit Breaker 통한 격리
-* Hystrix 설정: 요청처리 쓰레드에서 처리시간이 610 밀리가 초과할 경우 CirCuit Breaker Closing 설정
-
-Review(요청처리 쓰레드)에서 처리시간이 610 밀리가 초과할 경우 CirCuit Breaker Closing 설정
-
-![KakaoTalk_20210203_132348649](https://user-images.githubusercontent.com/5582138/106698167-9daa3c00-6623-11eb-84ed-6ece9f9afac6.png)
-```
-// Review 서비스 > application.yml 
-
-  feign:
-    hystrix:
-      enabled: true
-
-  hystrix:
-    command:
-      default:
-        execution.isolation.thread.timeoutInMilliseconds: 610
-```
-
-피호출되는 ItemDeleted 의 부하 처리 - 400 밀리초 + 랜덤으로 220 밀리초 추가되도록 sleep 조정
-
-![KakaoTalk_20210203_132118623](https://user-images.githubusercontent.com/5582138/106698322-ee219980-6623-11eb-8d58-f1ef6de78606.png)
-
-
-```java
-// Payment 서비스 > Payment.java
-
-	if ("Paid".equals(paymentStatus) ) {
-            System.out.println("=============결제 승인 처리중=============");
-            PaymentApproved paymentCompleted = new PaymentApproved();
-
-            paymentCompleted.setPaymentStatus("Paid");
-            paymentCompleted.setReservationNo(reservationNo);
-            paymentCompleted.setItemNo(itemNo);
-            paymentCompleted.setItemPrice(itemPrice);
-
-            BeanUtils.copyProperties(this, paymentCompleted);
-            paymentCompleted.publishAfterCommit();
-
-            try {
-                Thread.currentThread().sleep((long) (400 + Math.random() * 220));
-                System.out.println("=============결제 승인 완료=============");
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
-```
-
-
-동시사용자 10명 , 30초 동안 siege 부하 테스트 실시
-
-
-```
-siege -c10 -t30S -r10 -v --content-type "application/json" 'http://reservation:8080/reservations/1 PATCH {"paymentStatus":"Paid"}'
-```
-
-![KakaoTalk_20210203_130452776](https://user-images.githubusercontent.com/5582138/106697123-810d0480-6621-11eb-9792-e0eb79b1182c.png)
-
-
-![KakaoTalk_20210203_130503647](https://user-images.githubusercontent.com/5582138/106697125-8407f500-6621-11eb-86fd-d80d56910bd1.png)
-
-부하테스터 siege 툴을 통한 서킷 브레이커 동작 확인:
-
-* 앞서 설정한 부하가 발생하여 Circuit Breaker가 발동, 초반에는 요청 실패처리되었으며 <br> 밀린 부하가 payment에서 처리되면서 다시 요청을 받기 시작함
-* 적정 부하량 산출시 black-box Testing 에 의존
-
-
-
-
 ## 오토스케일 아웃
-reservation 시스템에 대한 replica 를 동적으로 늘려주도록 HPA 를 설정한다.
+review 시스템에 대한 replica 를 동적으로 늘려주도록 HPA 를 설정한다.
 설정은 CPU 사용량이 15프로를 넘어서면 replica 를 10개까지 늘려준다:
 
-* reservation > deployment.yml 설정
+* review > deployment.yml 설정
 
 ![KakaoTalk_20210203_160715126](https://user-images.githubusercontent.com/5582138/106710896-07354500-663a-11eb-9abe-3c3177fd7951.png)
 
 ````
-        kubectl autoscale deploy reservation --min=1 --max=10 --cpu-percent=15
+        kubectl autoscale deploy review --min=1 --max=10 --cpu-percent=15
 ```` 
+![image](./img/개인/autoscaled.PNG)
 
 
 * CirCuit Breaker와 동일한 방법으로 워크로드를 50초 걸어준다.
@@ -1017,22 +947,23 @@ reservation 시스템에 대한 replica 를 동적으로 늘려주도록 HPA 를
 ````
         kubectl exec -it pod/siege-5c7c46b788-4rn4r -c siege -- /bin/bash
 	
-	siege -c250 -t50S -r1000 -v --content-type "application/json" 'http://reservation:8080/reservations POST { "reservationNo":1, "paymentStatus":"Paid"}'
+	
+
+siege -c100 -t120S -r10 -v --content-type "application/json" 'http://review:8080/reviews POST {"customerId":"1", "customerName":"Janghyemi", "score":4}'
 ```` 
 
-![KakaoTalk_20210203_155639143](https://user-images.githubusercontent.com/5582138/106710240-fa642180-6638-11eb-94b4-33154c8b0fb5.png)
+![image](./img/개인/autoscale명령.PNG)
 
 
 * 오토스케일이 어떻게 되고 있는지 모니터링을 걸어둔다:
 
 ````
-kubectl get deploy reservation -w
+kubectl get deploy review -w
 ````
 
-![KakaoTalk_20210203_155715383](https://user-images.githubusercontent.com/5582138/106710245-fb954e80-6638-11eb-845b-92925a9fc9cf.png)
+![image](./img/개인/autoscale결과.PNG)
 
-
-
+부하에 의해 autoscaleout 된 것을 확인할 수 있다.
 
 
 
@@ -1100,40 +1031,6 @@ kubectl set image deploy item item=skcc10.azurecr.io/item:0.2
 - config map 생성 후 조회
 ```
 kubectl create configmap apiurl --from-literal=url=http://payment:8080
+kubectl create configmap itemurl --from-literal=url=http://item:8080
 kubectl get configmap apiurl -o yaml
 ```
-
-![image](./img/config4.png)
-
-
-## Self-healing (Liveness Probe)
-
-- Liveness Command probe 설정
-~~~
-nano exec-liveness.yaml
-~~~
-![commandProbe01](https://user-images.githubusercontent.com/20763542/106622135-a153a980-65b6-11eb-83da-67ba79da9304.jpg)
-
-- /tmp/healthy 파일이 존재하는지 확인하는 설정파일. 5초마다 해당 파일이 있는지 조회, Kubelet이 첫 체크하기 전에 기다리는 시간을 설정한다.
-
-![commandProbe02](https://user-images.githubusercontent.com/20763542/106618921-60a66100-65b3-11eb-8b22-04003d3d86ae.jpg)
-
-
-- 파일 설정으로 배포
-~~~
-kubectl create –f exec-liveness.yaml
-~~~
-![commandProbe03](https://user-images.githubusercontent.com/20763542/106618914-5edc9d80-65b3-11eb-9089-2b2ecc9934ba.jpg)
-
-- 결과 확인
-~~~
-kubectl describe pod liveness-exec
-~~~
-![commandProbe04](https://user-images.githubusercontent.com/20763542/106618916-5f753400-65b3-11eb-9d0a-30ccb363e5aa.jpg)
-
-- 파일이 존재하지 않을 경우, 정상 작동에 문제가 있다고 판단되어
-  kublet에 의해 자동으로 컨테이너가 재시작 된다.
-~~~
-kubectl get pod liveness-exec -o wide
-~~~
-![commandProbe05](https://user-images.githubusercontent.com/20763542/106618918-600dca80-65b3-11eb-9868-a71500c4afc6.jpg)
