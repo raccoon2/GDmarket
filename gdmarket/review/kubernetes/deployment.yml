@@ -20,7 +20,7 @@ spec:
           ports:
             - containerPort: 8080
           env:
-            - name: configurl
+            - name: itemurl
               valueFrom:
                 configMapKeyRef:
                   name: itemurl

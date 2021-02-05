@@ -31,7 +31,7 @@ public class Review {
         Item item = new Item();
         item.setItemNo(this.getReviewNo());
         // mappings goes here
-        ReviewApplication.applicationContext.getBean(ItemService.class).deleteItem(item.getItemNo(),"deleted");
+        ReviewApplication.applicationContext.getBean(ItemService.class).deleteItem(item);
     }
 
     public Integer getReviewNo() {

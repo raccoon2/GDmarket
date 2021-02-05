@@ -83,4 +83,4 @@ hystrix:
 
 api:
   url:
-    item: ${configurl}
+    item: ${itemurl}
